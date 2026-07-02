@@ -37,33 +37,61 @@ export async function GET(request: NextRequest) {
 
     const sql = getDb()
 
+    // JOIN submissions with employees to get all required fields
     const rows = await sql`
       SELECT
-        id, legajo, nombre_completo, dni, cuil, email, telefono,
-        obra_social, url_obra_social, id_archivo_obra_social,
-        provincia, localidad, barrio, calle, numero, manzana, block, piso, departamento,
-        descripcion_vivienda, latitud, longitud, direccion_formateada, place_id,
-        url_imagen_domicilio, id_archivo_domicilio,
-        declaracion_jurada, estado, created_at, updated_at
-      FROM form_submissions
+        s.id,
+        e.legajo,
+        e.nombre_completo,
+        e.dni,
+        e.cuil,
+        s.email,
+        s.telefono,
+        s.obra_social,
+        s.obra_social_file_url   AS url_obra_social,
+        s.obra_social_file_id    AS id_archivo_obra_social,
+        s.provincia,
+        s.localidad,
+        s.barrio,
+        s.calle,
+        s.numero,
+        s.manzana,
+        s.block,
+        s.piso,
+        s.departamento,
+        s.descripcion_vivienda,
+        s.latitud,
+        s.longitud,
+        s.direccion_formateada,
+        s.place_id,
+        s.domicilio_file_url     AS url_imagen_domicilio,
+        s.domicilio_file_id      AS id_archivo_domicilio,
+        s.declaracion_jurada,
+        s.estado,
+        s.created_at,
+        s.updated_at
+      FROM submissions s
+      JOIN employees e ON s.employee_id = e.id
       WHERE
         (${search} = '' OR
-         nombre_completo ILIKE ${'%' + search + '%'} OR
-         dni ILIKE ${'%' + search + '%'} OR
-         legajo ILIKE ${'%' + search + '%'})
-        AND (${estado} = '' OR estado = ${estado})
-      ORDER BY created_at DESC
+         e.nombre_completo ILIKE ${'%' + search + '%'} OR
+         e.dni             ILIKE ${'%' + search + '%'} OR
+         e.legajo          ILIKE ${'%' + search + '%'})
+        AND (${estado} = '' OR s.estado = ${estado})
+      ORDER BY s.created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `
 
     const countResult = await sql`
-      SELECT COUNT(*) as total FROM form_submissions
+      SELECT COUNT(*) AS total
+      FROM submissions s
+      JOIN employees e ON s.employee_id = e.id
       WHERE
         (${search} = '' OR
-         nombre_completo ILIKE ${'%' + search + '%'} OR
-         dni ILIKE ${'%' + search + '%'} OR
-         legajo ILIKE ${'%' + search + '%'})
-        AND (${estado} = '' OR estado = ${estado})
+         e.nombre_completo ILIKE ${'%' + search + '%'} OR
+         e.dni             ILIKE ${'%' + search + '%'} OR
+         e.legajo          ILIKE ${'%' + search + '%'})
+        AND (${estado} = '' OR s.estado = ${estado})
     `
 
     return Response.json({
@@ -91,7 +119,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const sql = getDb()
-    await sql`UPDATE form_submissions SET estado = ${estado} WHERE id = ${id}`
+    await sql`UPDATE submissions SET estado = ${estado} WHERE id = ${id}`
 
     return Response.json({ success: true })
   } catch (error) {

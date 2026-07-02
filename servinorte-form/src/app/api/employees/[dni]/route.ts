@@ -26,7 +26,7 @@ export async function GET(
 
     const sql = getDb()
     const rows = await sql`
-      SELECT id, dni, legajo, nombre_completo, cuil, is_active
+      SELECT id, dni, legajo, nombre_completo, cuil, activo
       FROM employees
       WHERE dni = ${dni}
       LIMIT 1
@@ -41,17 +41,17 @@ export async function GET(
 
     const employee = rows[0]
 
-    if (!employee.is_active) {
+    if (!employee.activo) {
       return Response.json(
         { error: 'No se encontró un empleado activo asociado al DNI ingresado. Por favor comuníquese con Recursos Humanos.' },
         { status: 403 }
       )
     }
 
-    // Check for existing submission
+    // Check for existing submission (via employee_id FK)
     const existing = await sql`
-      SELECT id, estado FROM form_submissions
-      WHERE dni = ${dni} AND estado != 'anulado'
+      SELECT id, estado FROM submissions
+      WHERE employee_id = ${employee.id} AND estado != 'anulado'
       LIMIT 1
     `
 

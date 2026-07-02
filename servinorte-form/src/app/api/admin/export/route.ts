@@ -35,32 +35,33 @@ export async function GET(request: NextRequest) {
     const sql = getDb()
     const rows = await sql`
       SELECT
-        legajo as "Legajo",
-        nombre_completo as "Nombre Completo",
-        dni as "DNI",
-        cuil as "CUIL",
-        email as "Correo Electrónico",
-        telefono as "Teléfono",
-        obra_social as "Obra Social",
-        url_obra_social as "URL Obra Social",
-        provincia as "Provincia",
-        localidad as "Localidad",
-        barrio as "Barrio",
-        calle as "Calle",
-        numero as "Número",
-        manzana as "Manzana",
-        block as "Block",
-        piso as "Piso",
-        departamento as "Departamento",
-        descripcion_vivienda as "Descripción Vivienda",
-        latitud as "Latitud",
-        longitud as "Longitud",
-        direccion_formateada as "Dirección Formateada",
-        url_imagen_domicilio as "URL Imagen Domicilio",
-        estado as "Estado",
-        created_at as "Fecha de Envío"
-      FROM form_submissions
-      ORDER BY created_at DESC
+        e.legajo                    AS "Legajo",
+        e.nombre_completo           AS "Nombre Completo",
+        e.dni                       AS "DNI",
+        e.cuil                      AS "CUIL",
+        s.email                     AS "Correo Electrónico",
+        s.telefono                  AS "Teléfono",
+        s.obra_social               AS "Obra Social",
+        s.obra_social_file_url      AS "URL Obra Social",
+        s.provincia                 AS "Provincia",
+        s.localidad                 AS "Localidad",
+        s.barrio                    AS "Barrio",
+        s.calle                     AS "Calle",
+        s.numero                    AS "Número",
+        s.manzana                   AS "Manzana",
+        s.block                     AS "Block",
+        s.piso                      AS "Piso",
+        s.departamento              AS "Departamento",
+        s.descripcion_vivienda      AS "Descripción Vivienda",
+        s.latitud                   AS "Latitud",
+        s.longitud                  AS "Longitud",
+        s.direccion_formateada      AS "Dirección Formateada",
+        s.domicilio_file_url        AS "URL Imagen Domicilio",
+        s.estado                    AS "Estado",
+        s.created_at                AS "Fecha de Envío"
+      FROM submissions s
+      JOIN employees e ON s.employee_id = e.id
+      ORDER BY s.created_at DESC
     `
 
     if (format === 'csv') {

@@ -30,7 +30,6 @@ export async function POST(request: NextRequest) {
       declaracion_jurada,
     } = body
 
-    // Validate required fields
     if (!dni || !email || !telefono || !obra_social || !provincia || !localidad || !barrio || !calle || !numero || !descripcion_vivienda || !declaracion_jurada) {
       return Response.json({ error: 'Faltan campos obligatorios' }, { status: 400 })
     }
@@ -41,39 +40,39 @@ export async function POST(request: NextRequest) {
 
     const sql = getDb()
 
-    // Verify employee
+    // Verify employee exists and is active
     const empRows = await sql`
-      SELECT id, legajo, nombre_completo, cuil, is_active
-      FROM employees WHERE dni = ${dni} AND is_active = true LIMIT 1
+      SELECT id, legajo, nombre_completo, cuil, activo
+      FROM employees WHERE dni = ${dni} AND activo = true LIMIT 1
     `
     if (empRows.length === 0) {
       return Response.json({ error: 'Empleado no encontrado o inactivo' }, { status: 403 })
     }
 
-    // Check duplicate
+    // Check duplicate submission
     const existing = await sql`
-      SELECT id FROM form_submissions WHERE dni = ${dni} AND estado != 'anulado' LIMIT 1
+      SELECT id FROM submissions WHERE employee_id = ${empRows[0].id} AND estado != 'anulado' LIMIT 1
     `
     if (existing.length > 0) {
       return Response.json({ error: 'Ya existe una actualización registrada para este empleado.' }, { status: 409 })
     }
 
-    // Insert submission
+    // Insert submission using existing Supabase schema column names
     const result = await sql`
-      INSERT INTO form_submissions (
-        employee_id, legajo, nombre_completo, dni, cuil,
-        email, telefono,
-        obra_social, url_obra_social, id_archivo_obra_social,
-        provincia, localidad, barrio, calle, numero, manzana, block, piso, departamento, descripcion_vivienda,
+      INSERT INTO submissions (
+        employee_id, email, telefono,
+        obra_social, obra_social_file_url, obra_social_file_id,
+        provincia, localidad, barrio, calle, numero,
+        manzana, block, piso, departamento, descripcion_vivienda,
         latitud, longitud, direccion_formateada, place_id,
-        url_imagen_domicilio, id_archivo_domicilio,
+        domicilio_file_url, domicilio_file_id,
         declaracion_jurada, estado, ip_address, user_agent
       ) VALUES (
-        ${empRows[0].id}, ${empRows[0].legajo}, ${empRows[0].nombre_completo}, ${dni}, ${empRows[0].cuil},
-        ${email}, ${telefono},
+        ${empRows[0].id}, ${email}, ${telefono},
         ${obra_social}, ${url_obra_social || null}, ${id_archivo_obra_social || null},
         ${provincia}, ${localidad}, ${barrio}, ${calle}, ${numero},
-        ${manzana || 'No corresponde'}, ${block || 'No corresponde'}, ${piso || 'No corresponde'}, ${departamento || 'No corresponde'},
+        ${manzana || 'No corresponde'}, ${block || 'No corresponde'},
+        ${piso || 'No corresponde'}, ${departamento || 'No corresponde'},
         ${descripcion_vivienda},
         ${latitud || null}, ${longitud || null}, ${direccion_formateada || null}, ${place_id || null},
         ${url_imagen_domicilio || null}, ${id_archivo_domicilio || null},
@@ -84,13 +83,13 @@ export async function POST(request: NextRequest) {
 
     const submissionId = result[0].id
 
-    // Log audit event
+    // Log to audit_logs
     await sql`
-      INSERT INTO audit_log (event_type, employee_dni, submission_id, details, ip_address)
-      VALUES ('form_submitted', ${dni}, ${submissionId}, ${JSON.stringify({ legajo, nombre_completo })}, ${ip})
+      INSERT INTO audit_logs (event_type, employee_dni, submission_id, details, ip_address)
+      VALUES ('form_submitted', ${dni}, ${submissionId}, ${JSON.stringify({ legajo: empRows[0].legajo, nombre_completo: empRows[0].nombre_completo })}, ${ip})
     `.catch(console.error)
 
-    // Sync to Google Sheets
+    // Sync to Google Sheets (optional — silently fails if not configured)
     let sheetsRow = 0
     const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID
     if (spreadsheetId) {
@@ -125,7 +124,7 @@ export async function POST(request: NextRequest) {
         })
 
         if (sheetsRow > 0) {
-          await sql`UPDATE form_submissions SET sheets_row = ${sheetsRow} WHERE id = ${submissionId}`
+          await sql`UPDATE submissions SET sheets_row = ${sheetsRow} WHERE id = ${submissionId}`
         }
       } catch (sheetsError) {
         console.error('Sheets sync error:', sheetsError)
